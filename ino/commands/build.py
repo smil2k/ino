@@ -118,8 +118,11 @@ class Build(Command):
                             help='Verbose make output')
 
     def discover(self, args):
+        board = self.e.board_model(args.board_model)
+	core = board['build']['core']
+
         self.e.find_arduino_dir('arduino_core_dir', 
-                                ['hardware', 'arduino', 'cores', 'arduino'], 
+                                ['hardware', 'arduino', 'cores', core], 
                                 ['Arduino.h'] if self.e.arduino_lib_version.major else ['WProgram.h'], 
                                 'Arduino core library')
 
