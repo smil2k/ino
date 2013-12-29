@@ -119,7 +119,7 @@ class Build(Command):
 
     def discover(self, args):
         board = self.e.board_model(args.board_model)
-	core = board['build']['core']
+        core = board['build']['core']
 
         self.e.find_arduino_dir('arduino_core_dir', 
                                 ['hardware', 'arduino', 'cores', core], 
