@@ -46,36 +46,43 @@ class Upload(Command):
         else:
             self.e.find_arduino_tool('avrdude', ['hardware', 'tools', 'avr', 'bin'])
             self.e.find_arduino_file('avrdude.conf', ['hardware', 'tools', 'avr', 'etc'])
-    
+
     def run(self, args):
         self.discover()
-        port = args.serial_port or self.e.guess_serial_port()
         board = self.e.board_model(args.board_model)
 
         protocol = board['upload']['protocol']
+        serialProgrammer = protocol != 'dapa'
+
         if protocol == 'stk500':
             # if v1 is not specifid explicitly avrdude will
             # try v2 first and fail
             protocol = 'stk500v1'
 
+	if serialProgrammer:
+            port = args.serial_port or self.e.guess_serial_port()
+	else:
+	    port = args.serial_port or self.e.guess_par_port()
+
         if not os.path.exists(port):
             raise Abort("%s doesn't exist. Is Arduino connected?" % port)
 
-        # send a hangup signal when the last process closes the tty
-        file_switch = '-f' if platform.system() == 'Darwin' else '-F'
-        ret = subprocess.call([self.e['stty'], file_switch, port, 'hupcl'])
-        if ret:
-            raise Abort("stty failed")
-
-        # pulse on DTR
-        try:
-            s = Serial(port, 115200)
-        except SerialException as e:
-            raise Abort(str(e))
-        s.setDTR(False)
-        sleep(0.1)
-        s.setDTR(True)
-        s.close()
+	if serialProgrammer:
+            # send a hangup signal when the last process closes the tty
+            file_switch = '-f' if platform.system() == 'Darwin' else '-F'
+            ret = subprocess.call([self.e['stty'], file_switch, port, 'hupcl'])
+            if ret:
+                raise Abort("stty failed")
+            # pulse on DTR
+            try:
+               s = Serial(port, 115200)
+            except SerialException as e:
+               raise Abort(str(e))
+ 
+            s.setDTR(False)
+            sleep(0.1)
+            s.setDTR(True)
+            s.close()
 
         # Need to do a little dance for Leonardo and derivatives:
         # open then close the port at the magic baudrate (usually 1200 bps) first
@@ -121,14 +128,22 @@ class Upload(Command):
 
             port = caterina_port
 
-        # call avrdude to upload .hex
-        subprocess.call([
+
+        processArgs=[
             self.e['avrdude'],
             '-C', self.e['avrdude.conf'],
             '-p', board['build']['mcu'],
             '-P', port,
             '-c', protocol,
-            '-b', board['upload']['speed'],
-            '-D',
-            '-U', 'flash:w:%s:i' % self.e['hex_path'],
-        ])
+            '-U', 'flash:w:%s:i' % self.e['hex_path'],]
+
+        if serialProgrammer:
+            processargs.append('-D')
+            if 'speed' in board['upload']:
+                processArgs.extend(['-b', board['upload']['speed']])
+        else:
+            if 'speed' in board['upload']:
+                processArgs.extend(['-i', board['upload']['speed']])
+
+        # call avrdude to upload .hex
+        subprocess.call( processArgs )

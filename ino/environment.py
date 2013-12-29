@@ -233,9 +233,22 @@ class Environment(dict):
             return ['/dev/tty.usbmodem*', '/dev/tty.usbserial*']
         raise NotImplementedError("Not implemented for Windows")
 
+    def par_port_patterns(self):
+        system = platform.system()
+        if system == 'Linux':
+            return ['/dev/parport*', '/dev/lp*']
+        raise NotImplementedError("Not implemented for Linux")
+
     def list_serial_ports(self):
         ports = []
         for p in self.serial_port_patterns():
+            matches = glob(p)
+            ports.extend(matches)
+        return ports
+
+    def list_par_ports(self):
+        ports = []
+        for p in self.par_port_patterns():
             matches = glob(p)
             ports.extend(matches)
         return ports
@@ -252,6 +265,19 @@ class Environment(dict):
         print colorize('FAILED', 'red')
         raise Abort("No device matching following was found: %s" %
                     (''.join(['\n  - ' + p for p in self.serial_port_patterns()])))
+
+    def guess_par_port(self):
+        print 'Guessing parallel port ...',
+
+        ports = self.list_par_ports()
+        if ports:
+            result = ports[0]
+            print colorize(result, 'yellow')
+            return result
+
+        print colorize('FAILED', 'red')
+        raise Abort("No device matching following was found: %s" %
+                    (''.join(['\n  - ' + p for p in self.par_port_patterns()])))
 
     def process_args(self, args):
         arduino_dist = getattr(args, 'arduino_dist', None)
